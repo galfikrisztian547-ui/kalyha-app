@@ -3,6 +3,7 @@ import streamlit.components.v1 as components
 import firebase_admin
 from firebase_admin import credentials, db
 import hashlib
+import time
 
 # BEIMPORTÁLJUK A KÜLSŐ FÁJLOKAT
 import hofok
@@ -10,6 +11,7 @@ import pumpa
 import kamera
 import beallitasok
 import uzenetek
+import tuzrakas
 
 st.set_page_config(page_title="Kályha App", page_icon="🔥", layout="centered")
 
@@ -152,7 +154,7 @@ else:
         st.title(f"📱 Kályha Vezérlő ({aktualis_nev})")
 
 
-        # Élő Főmenü panel: 5 mp-enként ellenőrzi az új üzeneteket, csippan és kirakja a piros pöttyöt a gombra
+        # Élő Főmenü panel: 5 mp-enként ellenőrzi az új üzeneteket és a tűzrakás időzítőt
         @st.fragment(run_every=5)
         def fomenu_panel():
             osszes_uzenet = db.reference('uzenetek').get() or {}
@@ -205,6 +207,14 @@ else:
                         height=0,
                     )
 
+            # Tűzrakás időzítő ellenőrzése a gomb feliratához
+            tuz_adat = db.reference('tuzrakas').get() or {}
+            lejarat_ts = tuz_adat.get('lejarat_ts', 0)
+            if lejarat_ts > 0 and int(time.time()) >= lejarat_ts:
+                tuz_gomb_felirat = "🔥 Tűzrakás (⚠️ Rá kell tenni!)"
+            else:
+                tuz_gomb_felirat = "🔥 Tűzrakás"
+
             # A piros jelzés közvetlenül az Üzenetek gombon jelenik meg
             uzenet_gomb_felirat = f"💬 Üzenetek (🔴 {olvasatlan_db})" if olvasatlan_db > 0 else "💬 Üzenetek"
 
@@ -215,6 +225,9 @@ else:
                     st.rerun()
                 if st.button("🌡️ Hőfok (Huzat)", use_container_width=True):
                     st.session_state.oldal = 'Hőfok'
+                    st.rerun()
+                if st.button(tuz_gomb_felirat, use_container_width=True):
+                    st.session_state.oldal = 'Tűzrakás'
                     st.rerun()
             with col2:
                 if st.button("📷 Kamera", use_container_width=True):
