@@ -32,57 +32,51 @@ def mutasd():
 
     aktualis_nev = st.session_state.get('nev', 'Ismeretlen')
     tuz_ref = db.reference('tuzrakas')
-    adat = tuz_ref.get() or {}
 
     # --- ÚJ TŰZRAKÁS RÖGZÍTÉSE ---
     st.subheader("🪵 Új rárakás rögzítése")
 
-    ido_opciok = {
-        "1 óra múlva": 60,
-        "1,5 óra múlva": 90,
-        "2 óra múlva": 120,
-        "2,5 óra múlva": 150,
-        "3 óra múlva": 180,
-        "4 óra múlva": 240,
-        "Egyedi perc megadása": 0
-    }
+    col_ora, col_perc = st.columns(2)
+    with col_ora:
+        ora_be = st.number_input("Óra (0 - 12)", min_value=0, max_value=12, value=2, step=1)
+    with col_perc:
+        perc_be = st.number_input("Perc (0 - 60)", min_value=0, max_value=60, value=0, step=1)
 
-    valasztott = st.selectbox("Mikor jelezzen újra?", list(ido_opciok.keys()), index=2)
-    if ido_opciok[valasztott] == 0:
-        percek = st.number_input("Hány perc múlva jelezzen?", min_value=1, max_value=720, value=90, step=5)
-    else:
-        percek = ido_opciok[valasztott]
+    osszes_perc = int(ora_be) * 60 + int(perc_be)
 
     if st.button("🔥 MEGRAKTAM A TÜZET MOST", use_container_width=True):
-        most_ts = int(time.time())
-        lejarat_ts = most_ts + (int(percek) * 60)
-        most_str = datetime.now().strftime("%Y.%m.%d %H:%M")
-        lejarat_str = (datetime.now() + timedelta(minutes=int(percek))).strftime("%H:%M")
+        if osszes_perc <= 0:
+            st.error("Adj meg legalább 1 percet!")
+        else:
+            most_ts = int(time.time())
+            lejarat_ts = most_ts + (osszes_perc * 60)
+            most_str = datetime.now().strftime("%Y.%m.%d %H:%M")
+            lejarat_str = (datetime.now() + timedelta(minutes=osszes_perc)).strftime("%H:%M")
 
-        tuz_ref.update({
-            'utolso_ki': aktualis_nev,
-            'utolso_mikor_str': most_str,
-            'utolso_ts': most_ts,
-            'lejarat_ts': lejarat_ts,
-            'lejarat_str': lejarat_str,
-            'idotartam_perc': int(percek),
-            'riasztas_elkuldve': False
-        })
+            tuz_ref.update({
+                'utolso_ki': aktualis_nev,
+                'utolso_mikor_str': most_str,
+                'utolso_ts': most_ts,
+                'lejarat_ts': lejarat_ts,
+                'lejarat_str': lejarat_str,
+                'idotartam_perc': osszes_perc,
+                'riasztas_elkuldve': False
+            })
 
-        # Napló mentése
-        db.reference('tuzrakas_naplo').push({
-            'ki': aktualis_nev,
-            'mikor': most_str,
-            'percek': int(percek)
-        })
+            # Napló mentése
+            db.reference('tuzrakas_naplo').push({
+                'ki': aktualis_nev,
+                'mikor': most_str,
+                'percek': osszes_perc
+            })
 
-        # Azonnali értesítés a másik fél telefonjára is
-        kuld_telefon_ertesitest(
-            "Kályha megrakva!",
-            f"{aktualis_nev} megrakta a tüzet ({most_str}). Következő rárakás: {lejarat_str}"
-        )
-        st.success(f"Rögzítve! Következő rárakás ideje: {lejarat_str}")
-        st.rerun()
+            # Azonnali értesítés a telefonra
+            kuld_telefon_ertesitest(
+                "Kályha megrakva!",
+                f"{aktualis_nev} megrakta a tüzet ({most_str}). Következő rárakás: {lejarat_str} ({ora_be} óra {perc_be} perc múlva)"
+            )
+            st.success(f"Rögzítve ({ora_be} óra {perc_be} perc)! Következő rárakás: {lejarat_str}")
+            st.rerun()
 
     st.divider()
 
@@ -147,6 +141,7 @@ def mutasd():
             lista = list(naplo.values())[-5:]
             lista.reverse()
             for elem in lista:
-                st.write(f"• **{elem.get('mikor')}** – {elem.get('ki')} ({elem.get('percek')} perc)")
+                p = elem.get('percek', 0)
+                st.write(f"• **{elem.get('mikor')}** – {elem.get('ki')} ({p // 60} óra {p % 60} perc)")
         else:
             st.write("Nincs még előzmény.")
