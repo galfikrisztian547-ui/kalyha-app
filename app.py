@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import firebase_admin
 from firebase_admin import credentials, db
+import hashlib
 
 # BEIMPORTÁLJUK A KÜLSŐ FÁJLOKAT
 import hofok
@@ -62,44 +63,25 @@ if 'oldal' not in st.session_state:
 if 'utolso_jelzett_uzenet_id' not in st.session_state:
     st.session_state.utolso_jelzett_uzenet_id = None
 
+# --- ESZKÖZ UJJLENYOMAT KÉSZÍTÉSE (BÖNGÉSZŐ + NYELV + PLATFORM ALAPJÁN) ---
+def eszkoz_azonosito():
+    fejlecek = st.context.headers
+    ua = fejlecek.get("User-Agent", "ismeretlen")
+    lang = fejlecek.get("Accept-Language", "")
+    sec_plat = fejlecek.get("Sec-Ch-Ua-Platform", "")
+    nyers = f"{ua}|{lang}|{sec_plat}"
+    return hashlib.sha256(nyers.encode("utf-8")).hexdigest()[:24]
+
+aktualis_eszkoz_id = eszkoz_azonosito()
 felhasznalok = db.reference('felhasznalok').get()
 
-# --- 1. BÖNGÉSZŐ SÜTI (COOKIE) ÉS URL ALAPÚ AUTOMATIKUS BELÉPTETÉS ---
-suti_user = st.context.cookies.get("kalyha_mentett_user")
-url_user = st.query_params.get("user")
-mentett_user = suti_user or url_user
-
-if not st.session_state.belepve and mentett_user and felhasznalok and mentett_user in felhasznalok:
-    st.session_state.belepve = True
-    st.session_state.jogosultsag = felhasznalok[mentett_user].get('szerepkor', 'user')
-    st.session_state.nev = mentett_user
-    if st.query_params.get("user") != mentett_user:
-        st.query_params["user"] = mentett_user
-
-if st.session_state.get("suti_mentes_kell"):
-    user_to_save = st.session_state.get("nev", "")
-    components.html(
-        f"""
-        <script>
-            document.cookie = "kalyha_mentett_user={user_to_save}; max-age=31536000; path=/; SameSite=Lax";
-            localStorage.setItem("kalyha_mentett_user", "{user_to_save}");
-        </script>
-        """,
-        height=0,
-    )
-    st.session_state.suti_mentes_kell = False
-
-if st.session_state.get("suti_torles_kell"):
-    components.html(
-        """
-        <script>
-            document.cookie = "kalyha_mentett_user=; max-age=0; path=/; SameSite=Lax";
-            localStorage.removeItem("kalyha_mentett_user");
-        </script>
-        """,
-        height=0,
-    )
-    st.session_state.suti_torles_kell = False
+# --- AUTOMATIKUS BELÉPTETÉS FIREBASE ALAPJÁN (FRISSÍTÉSKOR IS MEGMARAD) ---
+if not st.session_state.belepve and felhasznalok:
+    mentett_user = db.reference(f'bejelentkezett_eszkozok/{aktualis_eszkoz_id}').get()
+    if mentett_user and mentett_user in felhasznalok:
+        st.session_state.belepve = True
+        st.session_state.jogosultsag = felhasznalok[mentett_user].get('szerepkor', 'user')
+        st.session_state.nev = mentett_user
 
 # --- LOGIN (FŐ) KÉPERNYŐ ---
 if not st.session_state.belepve:
@@ -112,11 +94,10 @@ if not st.session_state.belepve:
         if st.button("Főprofil Létrehozása 👑", use_container_width=True):
             if uj_nev and uj_jelszo:
                 db.reference('felhasznalok').child(uj_nev).set({'jelszo': str(uj_jelszo), 'szerepkor': 'admin'})
+                db.reference(f'bejelentkezett_eszkozok/{aktualis_eszkoz_id}').set(uj_nev)
                 st.session_state.belepve = True
                 st.session_state.jogosultsag = 'admin'
                 st.session_state.nev = uj_nev
-                st.session_state.suti_mentes_kell = True
-                st.query_params["user"] = uj_nev
                 st.rerun()
             else:
                 st.error("Add meg a nevet és a jelszót is!")
@@ -133,8 +114,9 @@ if not st.session_state.belepve:
                     st.session_state.jogosultsag = felhasznalok[nev].get('szerepkor', 'admin')
                     st.session_state.nev = nev
                     if maradjak_belepve:
-                        st.session_state.suti_mentes_kell = True
-                        st.query_params["user"] = nev
+                        db.reference(f'bejelentkezett_eszkozok/{aktualis_eszkoz_id}').set(nev)
+                    else:
+                        db.reference(f'bejelentkezett_eszkozok/{aktualis_eszkoz_id}').delete()
                     st.rerun()
                 else:
                     st.error("Hibás adatok, vagy még nem hagyta jóvá a Rendszergazda!")
@@ -269,9 +251,8 @@ else:
             st.success("Értesítések és hang engedélyezve ezen az eszközön!")
 
         if st.button("Kijelentkezés 🔒", use_container_width=True):
+            db.reference(f'bejelentkezett_eszkozok/{aktualis_eszkoz_id}').delete()
             st.session_state.belepve = False
-            st.session_state.suti_torles_kell = True
-            st.query_params.clear()
             st.rerun()
 
     # ITT HÍVJUK MEG A KÜLSŐ FÁJLOKAT
