@@ -1,5 +1,6 @@
 import streamlit as st
 from firebase_admin import db
+import grafikon
 
 
 def mutasd():
@@ -10,8 +11,10 @@ def mutasd():
     st.divider()
 
     adatok = db.reference('/').get() or {}
+    akt_ho = adatok.get('aktualis_ho', 0)
+
     col1, col2 = st.columns(2)
-    col1.metric("Vízhőfok", f"{adatok.get('aktualis_ho', 0)} °C")
+    col1.metric("Vízhőfok", f"{akt_ho} °C")
     col2.metric("Ajtó állapota", adatok.get('allapot', 'Ismeretlen'))
 
     st.write("---")
@@ -28,3 +31,6 @@ def mutasd():
         db.reference('felso_hatar').set(felso)
         db.reference('uzemmod').set('AUTOMATA')
         st.success("Huzatszabályzó határértékek mentve!")
+
+    # Napi grafikon megjelenítése
+    grafikon.rogzit_es_rajzol(akt_ho)

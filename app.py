@@ -12,6 +12,7 @@ import kamera
 import beallitasok
 import uzenetek
 import tuzrakas
+import eletjel
 
 st.set_page_config(page_title="Kályha App", page_icon="🔥", layout="centered")
 
@@ -154,9 +155,12 @@ else:
         st.title(f"📱 Kályha Vezérlő ({aktualis_nev})")
 
 
-        # Élő Főmenü panel: 5 mp-enként ellenőrzi az új üzeneteket és a tűzrakás időzítőt
+        # Élő Főmenü panel: 5 mp-enként ellenőrzi az életjelet, az új üzeneteket és a tűzrakás időzítőt
         @st.fragment(run_every=5)
         def fomenu_panel():
+            # ESP32 kártya online/offline állapota
+            eletjel.mutasd_allapot()
+
             osszes_uzenet = db.reference('uzenetek').get() or {}
             olvasatlan_db = 0
             legujabb_nekem = None
