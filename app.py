@@ -1,0 +1,284 @@
+import streamlit as st
+import streamlit.components.v1 as components
+import firebase_admin
+from firebase_admin import credentials, db
+
+# BEIMPORTÁLJUK A KÜLSŐ FÁJLOKAT
+import hofok
+import pumpa
+import kamera
+import beallitasok
+import uzenetek
+
+st.set_page_config(page_title="Kályha App", page_icon="🔥", layout="centered")
+
+# CSS - FEKETE HÁTTÉR, ZÖLD GOMBOK, FEHÉR MEZŐK PIROS BETŰKKEL
+st.markdown("""
+    <style>
+    .stApp, .main { background-color: #000000 !important; }
+    h1, h2, h3, label, div[data-testid="stMetricLabel"] > label { color: #FFFFFF !important; }
+    p { color: #FFFFFF !important; } 
+    div[data-testid="stAlert"] p { color: #000000 !important; font-weight: bold !important; }
+
+    div.stButton > button, div.stFormSubmitButton > button {
+        background-color: #111111 !important;
+        color: #00FF00 !important; 
+        font-weight: bold !important;
+        border: 2px solid #444444 !important;
+    }
+    div[data-testid="column"] button { height: 100px !important; border-radius: 15px !important; font-size: 18px !important; }
+
+    div[data-baseweb="input"], 
+    div[data-baseweb="input"] > div, 
+    div[data-baseweb="base-input"] { 
+        background-color: #FFFFFF !important; 
+    }
+
+    input, input[type="text"], input[type="password"], input[type="number"] { 
+        background-color: #FFFFFF !important; 
+        color: #FF0000 !important; 
+        -webkit-text-fill-color: #FF0000 !important; 
+        font-weight: 900 !important; 
+        font-size: 18px !important;
+        border: 2px solid #555555 !important; 
+    }
+
+    div[data-testid="stMetricValue"] { color: #00FF00 !important; }
+    </style>
+""", unsafe_allow_html=True)
+
+if not firebase_admin._apps:
+    cred = credentials.Certificate('firebase-kulcs.json')
+    firebase_admin.initialize_app(cred, {
+        'databaseURL': 'https://kalyhafigyelo-default-rtdb.europe-west1.firebasedatabase.app/'})
+
+if 'belepve' not in st.session_state:
+    st.session_state.belepve = False
+if 'oldal' not in st.session_state:
+    st.session_state.oldal = 'Főmenü'
+if 'utolso_jelzett_uzenet_id' not in st.session_state:
+    st.session_state.utolso_jelzett_uzenet_id = None
+
+felhasznalok = db.reference('felhasznalok').get()
+
+# --- 1. BÖNGÉSZŐ SÜTI (COOKIE) ÉS URL ALAPÚ AUTOMATIKUS BELÉPTETÉS ---
+suti_user = st.context.cookies.get("kalyha_mentett_user")
+url_user = st.query_params.get("user")
+mentett_user = suti_user or url_user
+
+if not st.session_state.belepve and mentett_user and felhasznalok and mentett_user in felhasznalok:
+    st.session_state.belepve = True
+    st.session_state.jogosultsag = felhasznalok[mentett_user].get('szerepkor', 'user')
+    st.session_state.nev = mentett_user
+    if st.query_params.get("user") != mentett_user:
+        st.query_params["user"] = mentett_user
+
+if st.session_state.get("suti_mentes_kell"):
+    user_to_save = st.session_state.get("nev", "")
+    components.html(
+        f"""
+        <script>
+            document.cookie = "kalyha_mentett_user={user_to_save}; max-age=31536000; path=/; SameSite=Lax";
+            localStorage.setItem("kalyha_mentett_user", "{user_to_save}");
+        </script>
+        """,
+        height=0,
+    )
+    st.session_state.suti_mentes_kell = False
+
+if st.session_state.get("suti_torles_kell"):
+    components.html(
+        """
+        <script>
+            document.cookie = "kalyha_mentett_user=; max-age=0; path=/; SameSite=Lax";
+            localStorage.removeItem("kalyha_mentett_user");
+        </script>
+        """,
+        height=0,
+    )
+    st.session_state.suti_torles_kell = False
+
+# --- LOGIN (FŐ) KÉPERNYŐ ---
+if not st.session_state.belepve:
+    st.title("🔒 Kályhafigyelő")
+
+    if felhasznalok is None:
+        st.warning("Még nincs Rendszergazda! Az első fiók automatikusan a Főprofil (Admin) lesz!")
+        uj_nev = st.text_input("Főprofil Felhasználónév").strip()
+        uj_jelszo = st.text_input("Jelszó", type="password").strip()
+        if st.button("Főprofil Létrehozása 👑", use_container_width=True):
+            if uj_nev and uj_jelszo:
+                db.reference('felhasznalok').child(uj_nev).set({'jelszo': str(uj_jelszo), 'szerepkor': 'admin'})
+                st.session_state.belepve = True
+                st.session_state.jogosultsag = 'admin'
+                st.session_state.nev = uj_nev
+                st.session_state.suti_mentes_kell = True
+                st.query_params["user"] = uj_nev
+                st.rerun()
+            else:
+                st.error("Add meg a nevet és a jelszót is!")
+    else:
+        tab1, tab2 = st.tabs(["🚪 Belépés", "📝 Regisztráció kérése"])
+        with tab1:
+            nev = st.text_input("Felhasználónév").strip()
+            jelszo = st.text_input("Jelszó", type="password").strip()
+            maradjak_belepve = st.checkbox("Maradjak bejelentkezve", value=True)
+
+            if st.button("Belépés", use_container_width=True):
+                if nev in felhasznalok and str(felhasznalok[nev].get('jelszo', '')).strip() == jelszo:
+                    st.session_state.belepve = True
+                    st.session_state.jogosultsag = felhasznalok[nev].get('szerepkor', 'admin')
+                    st.session_state.nev = nev
+                    if maradjak_belepve:
+                        st.session_state.suti_mentes_kell = True
+                        st.query_params["user"] = nev
+                    st.rerun()
+                else:
+                    st.error("Hibás adatok, vagy még nem hagyta jóvá a Rendszergazda!")
+        with tab2:
+            st.warning("Új fiókot csak a Rendszergazda jóváhagyásával lehet létrehozni.")
+            ker_nev = st.text_input("Kívánt Felhasználónév", key="ker_nev").strip()
+            ker_jelszo = st.text_input("Kívánt Jelszó", type="password", key="ker_jel").strip()
+            if st.button("Kérelem Beküldése 📩", use_container_width=True):
+                if ker_nev in felhasznalok:
+                    st.error("Ez a név már létezik!")
+                elif ker_nev and ker_jelszo:
+                    db.reference('kerelmek').child(ker_nev).set({'jelszo': str(ker_jelszo)})
+                    st.success("Kérelem elküldve! A Rendszergazda hagyhatja jóvá a Beállításokban.")
+
+    # ---------------- QR KÓD A BELÉPÉS ELŐTT ----------------
+    st.write("---")
+    st.markdown("<h4 style='text-align: center; color: #FFFFFF;'>📲 Applikáció megnyitása</h4>", unsafe_allow_html=True)
+
+    jovobeli_app_link = "http://192.168.88.12:8501"
+    qr_kep_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={jovobeli_app_link}"
+
+    qr_col1, qr_col2, qr_col3 = st.columns([1, 1, 1])
+    with qr_col2:
+        st.image(qr_kep_url)
+    st.markdown("<p style='text-align: center; color: #AAAAAA; font-size: 14px;'>Szkenneld be a telefonoddal!</p>",
+                unsafe_allow_html=True)
+
+# --- HA BELÉPTÜNK ---
+else:
+    aktualis_nev = st.session_state.get('nev', '')
+
+    if st.session_state.oldal == 'Főmenü':
+        st.title(f"📱 Kályha Vezérlő ({aktualis_nev})")
+
+
+        # Élő Főmenü panel: 5 mp-enként ellenőrzi az új üzeneteket, csippan és kirakja a piros pöttyöt a gombra
+        @st.fragment(run_every=5)
+        def fomenu_panel():
+            osszes_uzenet = db.reference('uzenetek').get() or {}
+            olvasatlan_db = 0
+            legujabb_nekem = None
+            legujabb_ido = 0
+
+            for u_id, u_adat in osszes_uzenet.items():
+                if isinstance(u_adat, dict):
+                    if u_adat.get('cimzett') == aktualis_nev and not u_adat.get('olvasva', True):
+                        olvasatlan_db += 1
+                        ido = u_adat.get('timestamp', 0)
+                        if ido >= legujabb_ido:
+                            legujabb_ido = ido
+                            legujabb_nekem = (u_id, u_adat)
+
+            # Csippanás és értesítés, ha új üzenet érkezett
+            if legujabb_nekem:
+                u_id, u_adat = legujabb_nekem
+                if st.session_state.utolso_jelzett_uzenet_id != u_id:
+                    st.session_state.utolso_jelzett_uzenet_id = u_id
+                    kuldo = u_adat.get('kuldo', 'Valaki')
+                    szoveg = u_adat.get('szoveg', '')
+                    components.html(
+                        f"""
+                        <script>
+                            try {{
+                                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                                function csip(start, freq) {{
+                                    const osc = ctx.createOscillator();
+                                    const gain = ctx.createGain();
+                                    osc.type = 'sine';
+                                    osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+                                    gain.gain.setValueAtTime(0.3, ctx.currentTime + start);
+                                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + 0.15);
+                                    osc.connect(gain);
+                                    gain.connect(ctx.destination);
+                                    osc.start(ctx.currentTime + start);
+                                    osc.stop(ctx.currentTime + start + 0.15);
+                                }}
+                                csip(0, 880);
+                                csip(0.2, 1174);
+                            }} catch (e) {{}}
+                            window.parent.document.title = "🔔 Új üzenet ({kuldo})! - Kályha App";
+                            if ("Notification" in window && Notification.permission === "granted") {{
+                                new Notification("🔥 Kályha App - {kuldo}", {{ body: "{szoveg}" }});
+                            }}
+                        </script>
+                        """,
+                        height=0,
+                    )
+
+            # A piros jelzés közvetlenül az Üzenetek gombon jelenik meg
+            uzenet_gomb_felirat = f"💬 Üzenetek (🔴 {olvasatlan_db})" if olvasatlan_db > 0 else "💬 Üzenetek"
+
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("⚙️ Beállítások", use_container_width=True):
+                    st.session_state.oldal = 'Beállítások'
+                    st.rerun()
+                if st.button("🌡️ Hőfok (Huzat)", use_container_width=True):
+                    st.session_state.oldal = 'Hőfok'
+                    st.rerun()
+            with col2:
+                if st.button("📷 Kamera", use_container_width=True):
+                    st.session_state.oldal = 'Kamera'
+                    st.rerun()
+                if st.button("💧 Pumpa", use_container_width=True):
+                    st.session_state.oldal = 'Pumpa'
+                    st.rerun()
+                if st.button(uzenet_gomb_felirat, use_container_width=True):
+                    st.session_state.oldal = 'Üzenetek'
+                    st.rerun()
+
+
+        fomenu_panel()
+
+        st.divider()
+
+        if st.button("🔔 Hang és értesítések bekapcsolása", use_container_width=True):
+            components.html(
+                """
+                <script>
+                    if ("Notification" in window) {
+                        Notification.requestPermission();
+                    }
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    const osc = ctx.createOscillator();
+                    osc.connect(ctx.destination);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.1);
+                </script>
+                """,
+                height=0,
+            )
+            st.success("Értesítések és hang engedélyezve ezen az eszközön!")
+
+        if st.button("Kijelentkezés 🔒", use_container_width=True):
+            st.session_state.belepve = False
+            st.session_state.suti_torles_kell = True
+            st.query_params.clear()
+            st.rerun()
+
+    # ITT HÍVJUK MEG A KÜLSŐ FÁJLOKAT
+    elif st.session_state.oldal == 'Hőfok':
+        hofok.mutasd()
+    elif st.session_state.oldal == 'Pumpa':
+        pumpa.mutasd()
+    elif st.session_state.oldal == 'Kamera':
+        kamera.mutasd()
+    elif st.session_state.oldal == 'Beállítások':
+        beallitasok.mutasd()
+    elif st.session_state.oldal == 'Üzenetek':
+        uzenetek.mutasd()

@@ -1,0 +1,30 @@
+import streamlit as st
+from firebase_admin import db
+
+
+def mutasd():
+    st.title("🌡️ Huzatszabályzó")
+    if st.button("🔙 Vissza"):
+        st.session_state.oldal = 'Főmenü'
+        st.rerun()
+    st.divider()
+
+    adatok = db.reference('/').get() or {}
+    col1, col2 = st.columns(2)
+    col1.metric("Vízhőfok", f"{adatok.get('aktualis_ho', 0)} °C")
+    col2.metric("Ajtó állapota", adatok.get('allapot', 'Ismeretlen'))
+
+    st.write("---")
+    st.subheader("Automata hőfok határértékek")
+
+    i_col1, i_col2 = st.columns(2)
+    with i_col1:
+        also = st.number_input("Alsó határ (Nyit) °C", value=int(adatok.get('also_hatar', 50)), step=1)
+    with i_col2:
+        felso = st.number_input("Felső határ (Zár) °C", value=int(adatok.get('felso_hatar', 70)), step=1)
+
+    if st.button("Mentés 💾", use_container_width=True):
+        db.reference('also_hatar').set(also)
+        db.reference('felso_hatar').set(felso)
+        db.reference('uzemmod').set('AUTOMATA')
+        st.success("Huzatszabályzó határértékek mentve!")
