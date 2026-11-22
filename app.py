@@ -48,7 +48,10 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 if not firebase_admin._apps:
-    cred = credentials.Certificate('firebase-kulcs.json')
+    if "firebase" in st.secrets:
+        cred = credentials.Certificate(dict(st.secrets["firebase"]))
+    else:
+        cred = credentials.Certificate('firebase-kulcs.json')
     firebase_admin.initialize_app(cred, {
         'databaseURL': 'https://kalyhafigyelo-default-rtdb.europe-west1.firebasedatabase.app/'})
 
