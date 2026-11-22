@@ -8,15 +8,16 @@ import urllib.request
 # Ide írj egy egyedi, titkos csatornanevet, amire az ntfy appban feliratkoztok telefonon
 NTFY_CSATORNA = "kalyha_galfi_riasztas_2026"
 
-def kuld_telefon_ertesitest(cim, uzenet):
+def kuld_telefon_ertesitest(cim, uzenet, surgu=False):
     try:
+        prioritas = "urgent" if surgu else "high"
         req = urllib.request.Request(
             f"https://ntfy.sh/{NTFY_CSATORNA}",
             data=uzenet.encode("utf-8"),
             headers={
                 "Title": cim.encode("utf-8"),
-                "Priority": "high",
-                "Tags": "fire,bell"
+                "Priority": prioritas,
+                "Tags": "rotating_light,fire,bell" if surgu else "fire,bell"
             }
         )
         urllib.request.urlopen(req, timeout=3)
@@ -73,7 +74,8 @@ def mutasd():
             # Azonnali értesítés a telefonra
             kuld_telefon_ertesitest(
                 "Kályha megrakva!",
-                f"{aktualis_nev} megrakta a tüzet ({most_str}). Következő rárakás: {lejarat_str} ({ora_be} óra {perc_be} perc múlva)"
+                f"{aktualis_nev} megrakta a tüzet ({most_str}). Következő rárakás: {lejarat_str} ({ora_be} óra {perc_be} perc múlva)",
+                surgu=False
             )
             st.success(f"Rögzítve ({ora_be} óra {perc_be} perc)! Következő rárakás: {lejarat_str}")
             st.rerun()
@@ -104,26 +106,34 @@ def mutasd():
             keses_perc = abs(hatralevo_mp) // 60
             st.error(f"⚠️ **LEJÁRT AZ IDŐ! ({keses_perc} perce rá kellett volna tenni!)**")
 
-            # Ha még nem küldtünk push értesítést a lejáratról, most elküldjük
+            # Ha még nem küldtünk sürgős push értesítést a lejáratról, most elküldjük
             if not friss.get('riasztas_elkuldve', False):
                 db.reference('tuzrakas').update({'riasztas_elkuldve': True})
                 kuld_telefon_ertesitest(
                     "RÁ KELL TENNI A TŰZRE!",
-                    f"Lejárt a {friss.get('idotartam_perc', '')} perces időzítő! Ideje megrakni a kályhát."
+                    f"Lejárt a {friss.get('idotartam_perc', '')} perces időzítő! Ideje megrakni a kályhát.",
+                    surgu=True
                 )
 
-            # Hangjelzés, ha nyitva van az app
+            # Hosszú, többszörös riasztó csörgés, ha nyitva van az app
             components.html(
                 """
                 <script>
                     try {
                         const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                        const osc = ctx.createOscillator();
-                        osc.type = 'square';
-                        osc.frequency.setValueAtTime(950, ctx.currentTime);
-                        osc.connect(ctx.destination);
-                        osc.start();
-                        osc.stop(ctx.currentTime + 0.3);
+                        const idopontok = [0, 0.4, 0.8, 1.2, 1.8, 2.2, 2.6, 3.0];
+                        idopontok.forEach((start, idx) => {
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.type = 'square';
+                            osc.frequency.setValueAtTime(idx % 2 === 0 ? 980 : 1250, ctx.currentTime + start);
+                            gain.gain.setValueAtTime(0.5, ctx.currentTime + start);
+                            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + start + 0.3);
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.start(ctx.currentTime + start);
+                            osc.stop(ctx.currentTime + start + 0.3);
+                        });
                     } catch (e) {}
                 </script>
                 """,
