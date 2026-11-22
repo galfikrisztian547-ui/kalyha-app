@@ -153,7 +153,7 @@ if not st.session_state.belepve:
     st.write("---")
     st.markdown("<h4 style='text-align: center; color: #FFFFFF;'>📲 Applikáció megnyitása</h4>", unsafe_allow_html=True)
 
-    jovobeli_app_link = "http://192.168.88.12:8501"
+    jovobeli_app_link = "https://kalyha-app-f6ktjmojgtaxtus3rtnigd.streamlit.app/"
     qr_kep_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={jovobeli_app_link}"
 
     qr_col1, qr_col2, qr_col3 = st.columns([1, 1, 1])
