@@ -1,5 +1,7 @@
 import streamlit as st
 from firebase_admin import db
+import random
+import time
 
 
 def mutasd():
@@ -28,6 +30,10 @@ def mutasd():
             if st.button("👥 Felhasználók", use_container_width=True):
                 st.session_state.beall_aloldal = 'felhasznalok'
                 st.rerun()
+        with col2:
+            if st.button("🔌 Csatlakozás az ESP32-re", use_container_width=True):
+                st.session_state.beall_aloldal = 'esp32'
+                st.rerun()
 
     # --- 2. FELHASZNÁLÓK ÉS KÉRELMEK ALMENÜ ---
     elif st.session_state.beall_aloldal == 'felhasznalok':
@@ -39,13 +45,10 @@ def mutasd():
 
         felhasznalok = db.reference('felhasznalok').get()
 
-        # =========================================================
         # A) HA RENDSZERGAZDA (ADMIN) VAN BELÉPVE -> MINDENT LÁT ÉS SZERKESZT
-        # =========================================================
         if jogosultsag == 'admin':
             st.subheader("📋 Regisztrált felhasználók és jelszavak")
             if felhasznalok:
-                # 1. Rendszergazda (Főnök) legfelül
                 for f_nev, f_adat in felhasznalok.items():
                     if isinstance(f_adat, dict) and f_adat.get('szerepkor') == 'admin':
                         jelenlegi_jel = str(f_adat.get('jelszo', ''))
@@ -64,7 +67,6 @@ def mutasd():
                                     st.rerun()
                         st.write("---")
 
-                # 2. További felhasználók
                 for f_nev, f_adat in felhasznalok.items():
                     if isinstance(f_adat, dict) and f_adat.get('szerepkor') != 'admin':
                         jelenlegi_jel = str(f_adat.get('jelszo', ''))
@@ -89,7 +91,6 @@ def mutasd():
             else:
                 st.warning("Nincsenek regisztrált felhasználók.")
 
-            # Függőben lévő kérelmek (csak admin látja)
             st.subheader("📩 Függőben lévő kérelmek")
             kerelmek = db.reference('kerelmek').get()
             if kerelmek:
@@ -113,9 +114,7 @@ def mutasd():
             else:
                 st.success("Nincsenek függőben lévő kérelmek.")
 
-        # =========================================================
         # B) HA SIMA FELHASZNÁLÓ VAN BELÉPVE -> CSAK A NEVEKET LÁTJA
-        # =========================================================
         else:
             st.subheader("📋 Rendszer tagjai")
             if felhasznalok:
@@ -127,3 +126,52 @@ def mutasd():
                         st.write(f"👤 **{f_nev}** — Felhasználó")
             else:
                 st.warning("Nincsenek regisztrált felhasználók.")
+
+    # --- 3. ESP32 PÁROSÍTÁS / KÁRTYACSERE ALMENÜ ---
+    elif st.session_state.beall_aloldal == 'esp32':
+        st.title("🔌 ESP32 Párosítás")
+        if st.button("🔙 Vissza a Beállításokhoz"):
+            st.session_state.beall_aloldal = 'fomenu'
+            st.rerun()
+        st.divider()
+
+        esp_ref = db.reference('esp32_config')
+        esp_adat = esp_ref.get() or {}
+
+        @st.fragment(run_every=4)
+        def esp_statusz_panel():
+            friss = db.reference('esp32_config').get() or {}
+            parosito_kod = friss.get('parosito_kod', '')
+            utolso_sziv = friss.get('utolso_eletjel', 0)
+            most = int(time.time())
+
+            if parosito_kod:
+                st.info(f"🔑 **Aktív párosító kód:** `{parosito_kod}`")
+
+            if utolso_sziv > 0 and (most - int(utolso_sziv)) <= 20:
+                st.success("🟢 **A kártya csatlakoztatva van és ONLINE!**")
+            elif parosito_kod:
+                st.warning("🟡 **Várakozás a kártya csatlakozására...** (Add meg a kódot a kártya Wi-Fi felületén)")
+            else:
+                st.error("🔴 **Nincs párosított ESP32 kártya!**")
+
+        esp_statusz_panel()
+
+        st.divider()
+
+        if jogosultsag == 'admin':
+            st.subheader("🔄 Új kártya párosítása / Kártyacsere")
+            st.write("1. Nyomj az **Új párosító kód generálása** gombra.")
+            st.write("2. Telefonon csatlakozz rá a **`Kalyha_Beallitas`** Wi-Fi hálózatra.")
+            st.write("3. Írd be az otthoni Wi-Fi adatait és a lenti 6 jegyű kódot!")
+
+            if st.button("🔑 Új párosító kód generálása", use_container_width=True):
+                uj_kod = str(random.randint(100000, 999999))
+                esp_ref.set({
+                    'parosito_kod': uj_kod,
+                    'utolso_eletjel': 0
+                })
+                st.success(f"Új kód létrehozva: {uj_kod}")
+                st.rerun()
+        else:
+            st.warning("Csak a Rendszergazda párosíthat új ESP32 kártyát.")
