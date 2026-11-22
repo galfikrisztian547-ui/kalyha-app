@@ -266,5 +266,5 @@ else:
         beallitasok.mutasd()
     elif st.session_state.oldal == 'Üzenetek':
         uzenetek.mutasd()
-        elif st.session_state.oldal == 'Tűzrakás':
+    elif st.session_state.oldal == 'Tűzrakás':
         tuzrakas.mutasd()
