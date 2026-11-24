@@ -128,7 +128,7 @@ def mutasd():
             else:
                 st.warning("Nincsenek regisztrált felhasználók.")
 
-    # --- 3. WI-FI ÉS ESP32 KEZELŐ KÖZVETLENÜL AZ APPBÓL ---
+    # --- 3. WI-FI ÉS ESP32 KEZELŐ LEGÖRDÜLŐ WI-FI LISTÁVAL ---
     elif st.session_state.beall_aloldal == 'esp32':
         st.title("📶 Wi-Fi és ESP32")
         if st.button("🔙 Vissza a Beállításokhoz"):
@@ -162,24 +162,46 @@ def mutasd():
         if jogosultsag == 'admin':
             adatok = esp_ref.get() or {}
 
-            st.subheader("📡 Wi-Fi hálózat beállítása / módosítása")
-            st.write("Ha másik Wi-Fi-re szeretnéd vinni az ESP32-t, írd be ide az új Wi-Fi nevét és jelszavát:")
+            st.subheader("📡 Elérhető Wi-Fi hálózat kiválasztása")
+            col_scan1, col_scan2 = st.columns([3, 1])
+            with col_scan1:
+                st.write("Válassz az ESP32 által talált hálózatok közül:")
+            with col_scan2:
+                if st.button("🔍 Keresés", use_container_width=True):
+                    esp_ref.update({'keres_wifi': True})
+                    st.toast("ESP32 keresi a Wi-Fi hálózatokat...")
+                    time.sleep(2)
+                    st.rerun()
 
-            wifi_nev = st.text_input("Wi-Fi neve (SSID)", value=adatok.get('wifi_ssid', ''))
+            nyers_lista = adatok.get('elerheto_wifik', '')
+            wifi_opciok = [w.strip() for w in str(nyers_lista).split('|') if w.strip()]
+            wifi_opciok.append("✍️ Kézi megadás...")
+
+            jelenlegi_ssid = adatok.get('wifi_ssid', '')
+            alap_index = wifi_opciok.index(jelenlegi_ssid) if jelenlegi_ssid in wifi_opciok else 0
+
+            valasztott = st.selectbox("Talált Wi-Fi hálózatok", options=wifi_opciok, index=alap_index)
+
+            if valasztott == "✍️ Kézi megadás...":
+                wifi_nev = st.text_input("Wi-Fi neve (SSID)", value=jelenlegi_ssid)
+            else:
+                wifi_nev = valasztott
+
             wifi_jel = st.text_input("Wi-Fi jelszava", value=adatok.get('wifi_pass', ''), type="password")
+            kod_mezo = st.text_input("6 jegyű párosító kód", value=adatok.get('parosito_kod', ''))
 
             if st.button("💾 Wi-Fi adatok mentése és küldése", use_container_width=True):
                 if wifi_nev.strip():
-                    kod = adatok.get('parosito_kod') or str(random.randint(100000, 999999))
+                    vegso_kod = kod_mezo.strip() or str(random.randint(100000, 999999))
                     esp_ref.update({
                         'wifi_ssid': wifi_nev.strip(),
                         'wifi_pass': wifi_jel,
-                        'parosito_kod': kod
+                        'parosito_kod': vegso_kod
                     })
                     st.success(f"Mentve! Az ESP32 átáll a(z) '{wifi_nev.strip()}' hálózatra.")
                     st.rerun()
                 else:
-                    st.error("Add meg a Wi-Fi nevét!")
+                    st.error("Válassz vagy írj be egy Wi-Fi nevet!")
 
             st.divider()
             st.subheader("🔑 Új párosító kód kérése / kártya alaphelyzetbe állítása")
@@ -191,13 +213,6 @@ def mutasd():
                 })
                 st.success(f"Új kód létrehozva: {uj_kod}")
                 st.rerun()
-
-            st.info(
-                "💡 **Ha az ESP32 még nincs fent egyetlen Wi-Fi-n sem (vagy elment a hálózat):**\n"
-                "1. Lépj fel a telefonodon a **`Kalyha_Beallitas`** nevű Wi-Fi-re.\n"
-                "2. Nyisd meg a telefon böngészőjében a **`http://192.168.4.1`** címet (egyszerű magyar felület), "
-                "add meg a Wi-Fi nevet, jelszót és a fenti 6 jegyű kódot — utána már mindent innen az appból irányítasz!"
-            )
         else:
             st.warning("Csak a Rendszergazda módosíthatja a Wi-Fi beállításokat.")
 
