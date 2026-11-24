@@ -30,7 +30,7 @@ def mutasd():
                 st.session_state.beall_aloldal = 'felhasznalok'
                 st.rerun()
         with col2:
-            if st.button("🔌 Csatlakozás az ESP32-re", use_container_width=True):
+            if st.button("📶 Wi-Fi és ESP32", use_container_width=True):
                 st.session_state.beall_aloldal = 'esp32'
                 st.rerun()
 
@@ -128,9 +128,9 @@ def mutasd():
             else:
                 st.warning("Nincsenek regisztrált felhasználók.")
 
-    # --- 3. ESP32 PÁROSÍTÁS / KÁRTYACSERE ALMENÜ ---
+    # --- 3. WI-FI ÉS ESP32 KEZELŐ KÖZVETLENÜL AZ APPBÓL ---
     elif st.session_state.beall_aloldal == 'esp32':
-        st.title("🔌 ESP32 Párosítás")
+        st.title("📶 Wi-Fi és ESP32")
         if st.button("🔙 Vissza a Beállításokhoz"):
             st.session_state.beall_aloldal = 'fomenu'
             st.rerun()
@@ -143,10 +143,11 @@ def mutasd():
             friss = db.reference('esp32_config').get() or {}
             parosito_kod = friss.get('parosito_kod', '')
             utolso_sziv = friss.get('utolso_eletjel', 0)
+            aktiv_wifi = friss.get('wifi_ssid', 'Nincs megadva')
             most = int(time.time())
 
             if parosito_kod:
-                st.info(f"🔑 **Aktív párosító kód:** `{parosito_kod}`")
+                st.info(f"🔑 **Aktív párosító kód:** `{parosito_kod}` | **Mentett Wi-Fi:** `{aktiv_wifi}`")
 
             if utolso_sziv > 0 and (most - int(utolso_sziv)) <= 20:
                 st.success("🟢 **A kártya csatlakoztatva van és ONLINE!**")
@@ -159,7 +160,30 @@ def mutasd():
         st.divider()
 
         if jogosultsag == 'admin':
-            if st.button("🔑 Új párosító kód generálása", use_container_width=True):
+            adatok = esp_ref.get() or {}
+
+            st.subheader("📡 Wi-Fi hálózat beállítása / módosítása")
+            st.write("Ha másik Wi-Fi-re szeretnéd vinni az ESP32-t, írd be ide az új Wi-Fi nevét és jelszavát:")
+
+            wifi_nev = st.text_input("Wi-Fi neve (SSID)", value=adatok.get('wifi_ssid', ''))
+            wifi_jel = st.text_input("Wi-Fi jelszava", value=adatok.get('wifi_pass', ''), type="password")
+
+            if st.button("💾 Wi-Fi adatok mentése és küldése", use_container_width=True):
+                if wifi_nev.strip():
+                    kod = adatok.get('parosito_kod') or str(random.randint(100000, 999999))
+                    esp_ref.update({
+                        'wifi_ssid': wifi_nev.strip(),
+                        'wifi_pass': wifi_jel,
+                        'parosito_kod': kod
+                    })
+                    st.success(f"Mentve! Az ESP32 átáll a(z) '{wifi_nev.strip()}' hálózatra.")
+                    st.rerun()
+                else:
+                    st.error("Add meg a Wi-Fi nevét!")
+
+            st.divider()
+            st.subheader("🔑 Új párosító kód kérése / kártya alaphelyzetbe állítása")
+            if st.button("🔄 Új kód generálása (Lecsatlakozás és újrapárosítás)", use_container_width=True):
                 uj_kod = str(random.randint(100000, 999999))
                 esp_ref.update({
                     'parosito_kod': uj_kod,
@@ -167,8 +191,15 @@ def mutasd():
                 })
                 st.success(f"Új kód létrehozva: {uj_kod}")
                 st.rerun()
+
+            st.info(
+                "💡 **Ha az ESP32 még nincs fent egyetlen Wi-Fi-n sem (vagy elment a hálózat):**\n"
+                "1. Lépj fel a telefonodon a **`Kalyha_Beallitas`** nevű Wi-Fi-re.\n"
+                "2. Nyisd meg a telefon böngészőjében a **`http://192.168.4.1`** címet (egyszerű magyar felület), "
+                "add meg a Wi-Fi nevet, jelszót és a fenti 6 jegyű kódot — utána már mindent innen az appból irányítasz!"
+            )
         else:
-            st.warning("Csak a Rendszergazda párosíthat új ESP32 kártyát.")
+            st.warning("Csak a Rendszergazda módosíthatja a Wi-Fi beállításokat.")
 
     # --- 4. NYITÁS-ZÁRÁS IDŐZÍTÉS ÉS HŐFOK TESZT ALMENÜ ---
     elif st.session_state.beall_aloldal == 'idozites_teszt':
@@ -178,7 +209,6 @@ def mutasd():
             st.rerun()
         st.divider()
 
-        # A) Nyitás-Zárás impulzus idő (másodpercben)
         st.subheader("⚙️ Motor / Relé működési ideje")
         st.write("Mennyi ideig kapjon áramot a mozgató motor nyitáskor vagy záráskor (utána automatikusan lekapcsol):")
 
@@ -199,7 +229,6 @@ def mutasd():
 
         st.divider()
 
-        # B) Műhőfok tesztelő (amíg nincs meg a fizikai hőmérő szenzor)
         st.subheader("🧪 Vízhőfok szimulátor (Szenzor nélküli teszt)")
         st.write("Húzd el a csúszkát, mintha melegedne vagy hűlne a víz, és nézd az ESP32 LED-jét:")
 
