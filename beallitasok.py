@@ -8,7 +8,6 @@ def mutasd():
     if 'beall_aloldal' not in st.session_state:
         st.session_state.beall_aloldal = 'fomenu'
 
-    # Élő ellenőrzés a Firebase-ből, hogy biztosan pontos legyen a jogosultság
     aktualis_nev = st.session_state.get('nev')
     jogosultsag = st.session_state.get('jogosultsag')
     if aktualis_nev:
@@ -35,6 +34,11 @@ def mutasd():
                 st.session_state.beall_aloldal = 'esp32'
                 st.rerun()
 
+        st.write("")
+        if st.button("⏱️ Nyitás-Zárás idő & Hőfok teszt", use_container_width=True):
+            st.session_state.beall_aloldal = 'idozites_teszt'
+            st.rerun()
+
     # --- 2. FELHASZNÁLÓK ÉS KÉRELMEK ALMENÜ ---
     elif st.session_state.beall_aloldal == 'felhasznalok':
         st.title("👥 Felhasználók")
@@ -45,7 +49,6 @@ def mutasd():
 
         felhasznalok = db.reference('felhasznalok').get()
 
-        # A) HA RENDSZERGAZDA (ADMIN) VAN BELÉPVE -> MINDENT LÁT ÉS SZERKESZT
         if jogosultsag == 'admin':
             st.subheader("📋 Regisztrált felhasználók és jelszavak")
             if felhasznalok:
@@ -113,8 +116,6 @@ def mutasd():
                     st.write("---")
             else:
                 st.success("Nincsenek függőben lévő kérelmek.")
-
-        # B) HA SIMA FELHASZNÁLÓ VAN BELÉPVE -> CSAK A NEVEKET LÁTJA
         else:
             st.subheader("📋 Rendszer tagjai")
             if felhasznalok:
@@ -136,7 +137,6 @@ def mutasd():
         st.divider()
 
         esp_ref = db.reference('esp32_config')
-        esp_adat = esp_ref.get() or {}
 
         @st.fragment(run_every=4)
         def esp_statusz_panel():
@@ -151,23 +151,17 @@ def mutasd():
             if utolso_sziv > 0 and (most - int(utolso_sziv)) <= 20:
                 st.success("🟢 **A kártya csatlakoztatva van és ONLINE!**")
             elif parosito_kod:
-                st.warning("🟡 **Várakozás a kártya csatlakozására...** (Add meg a kódot a kártya Wi-Fi felületén)")
+                st.warning("🟡 **Várakozás a kártya csatlakozására...**")
             else:
                 st.error("🔴 **Nincs párosított ESP32 kártya!**")
 
         esp_statusz_panel()
-
         st.divider()
 
         if jogosultsag == 'admin':
-            st.subheader("🔄 Új kártya párosítása / Kártyacsere")
-            st.write("1. Nyomj az **Új párosító kód generálása** gombra.")
-            st.write("2. Telefonon csatlakozz rá a **`Kalyha_Beallitas`** Wi-Fi hálózatra.")
-            st.write("3. Írd be az otthoni Wi-Fi adatait és a lenti 6 jegyű kódot!")
-
             if st.button("🔑 Új párosító kód generálása", use_container_width=True):
                 uj_kod = str(random.randint(100000, 999999))
-                esp_ref.set({
+                esp_ref.update({
                     'parosito_kod': uj_kod,
                     'utolso_eletjel': 0
                 })
@@ -175,3 +169,45 @@ def mutasd():
                 st.rerun()
         else:
             st.warning("Csak a Rendszergazda párosíthat új ESP32 kártyát.")
+
+    # --- 4. NYITÁS-ZÁRÁS IDŐZÍTÉS ÉS HŐFOK TESZT ALMENÜ ---
+    elif st.session_state.beall_aloldal == 'idozites_teszt':
+        st.title("⏱️ Időzítés és Teszt")
+        if st.button("🔙 Vissza a Beállításokhoz"):
+            st.session_state.beall_aloldal = 'fomenu'
+            st.rerun()
+        st.divider()
+
+        # A) Nyitás-Zárás impulzus idő (másodpercben)
+        st.subheader("⚙️ Motor / Relé működési ideje")
+        st.write("Mennyi ideig kapjon áramot a mozgató motor nyitáskor vagy záráskor (utána automatikusan lekapcsol):")
+
+        jelenlegi_ido = db.reference('esp32_config/mozgatas_mp').get()
+        if jelenlegi_ido is None:
+            jelenlegi_ido = 3.0
+
+        uj_ido = st.number_input(
+            "Nyitás / Zárás időtartama (másodperc)",
+            min_value=0.5,
+            max_value=30.0,
+            value=float(jelenlegi_ido),
+            step=0.5
+        )
+        if st.button("Időzítés mentése 💾", use_container_width=True):
+            db.reference('esp32_config/mozgatas_mp').set(float(uj_ido))
+            st.success(f"Mentve! Mostantól {uj_ido} másodpercig ad áramot, aztán lekapcsol.")
+
+        st.divider()
+
+        # B) Műhőfok tesztelő (amíg nincs meg a fizikai hőmérő szenzor)
+        st.subheader("🧪 Vízhőfok szimulátor (Szenzor nélküli teszt)")
+        st.write("Húzd el a csúszkát, mintha melegedne vagy hűlne a víz, és nézd az ESP32 LED-jét:")
+
+        akt_ho = db.reference('aktualis_ho').get()
+        if akt_ho is None:
+            akt_ho = 22.5
+
+        teszt_ho = st.slider("Szimulált vízhőfok (°C)", min_value=15.0, max_value=95.0, value=float(akt_ho), step=0.5)
+        if st.button("🌡️ Hőfok beküldése", use_container_width=True):
+            db.reference('aktualis_ho').set(float(teszt_ho))
+            st.success(f"Vízhőfok beállítva erre: {teszt_ho} °C")
