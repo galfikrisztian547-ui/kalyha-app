@@ -147,10 +147,10 @@ def mutasd():
             most = int(time.time())
 
             if parosito_kod:
-                st.info(f"🔑 **Aktív párosító kód:** `{parosito_kod}` | **Mentett Wi-Fi:** `{aktiv_wifi}`")
+                st.info(f"🔑 **Aktív párosító kód:** `{parosito_kod}` | **Aktuális Wi-Fi:** `{aktiv_wifi}`")
 
             if utolso_sziv > 0 and (most - int(utolso_sziv)) <= 20:
-                st.success("🟢 **A kártya csatlakoztatva van és ONLINE!**")
+                st.success("🟢 **Az ESP32 kártya ONLINE!**")
             elif parosito_kod:
                 st.warning("🟡 **Várakozás a kártya csatlakozására...**")
             else:
@@ -162,46 +162,43 @@ def mutasd():
         if jogosultsag == 'admin':
             adatok = esp_ref.get() or {}
 
-            st.subheader("📡 Elérhető Wi-Fi hálózat kiválasztása")
+            st.subheader("📡 Elérhető Wi-Fi hálózatok")
             col_scan1, col_scan2 = st.columns([3, 1])
             with col_scan1:
-                st.write("Válassz az ESP32 által talált hálózatok közül:")
+                st.write("Válassz a kártya körül található Wi-Fi hálózatok közül:")
             with col_scan2:
-                if st.button("🔍 Keresés", use_container_width=True):
+                if st.button("🔍 Frissítés", use_container_width=True):
                     esp_ref.update({'keres_wifi': True})
-                    st.toast("ESP32 keresi a Wi-Fi hálózatokat...")
+                    st.toast("ESP32 frissíti a Wi-Fi listát...")
                     time.sleep(2)
                     st.rerun()
 
             nyers_lista = adatok.get('elerheto_wifik', '')
             wifi_opciok = [w.strip() for w in str(nyers_lista).split('|') if w.strip()]
-            wifi_opciok.append("✍️ Kézi megadás...")
 
-            jelenlegi_ssid = adatok.get('wifi_ssid', '')
-            alap_index = wifi_opciok.index(jelenlegi_ssid) if jelenlegi_ssid in wifi_opciok else 0
-
-            valasztott = st.selectbox("Talált Wi-Fi hálózatok", options=wifi_opciok, index=alap_index)
-
-            if valasztott == "✍️ Kézi megadás...":
-                wifi_nev = st.text_input("Wi-Fi neve (SSID)", value=jelenlegi_ssid)
+            if not wifi_opciok:
+                st.warning("Még nincs betöltött Wi-Fi lista (csatlakoztasd először a kártyát a Kalyha_Beallitas hálózaton).")
+                wifi_nev = ""
             else:
-                wifi_nev = valasztott
+                jelenlegi_ssid = adatok.get('wifi_ssid', '')
+                alap_index = wifi_opciok.index(jelenlegi_ssid) if jelenlegi_ssid in wifi_opciok else 0
+                wifi_nev = st.selectbox("Talált Wi-Fi hálózatok", options=wifi_opciok, index=alap_index)
 
             wifi_jel = st.text_input("Wi-Fi jelszava", value=adatok.get('wifi_pass', ''), type="password")
             kod_mezo = st.text_input("6 jegyű párosító kód", value=adatok.get('parosito_kod', ''))
 
-            if st.button("💾 Wi-Fi adatok mentése és küldése", use_container_width=True):
-                if wifi_nev.strip():
+            if st.button("💾 Átállás a kiválasztott Wi-Fi-re", use_container_width=True):
+                if wifi_nev:
                     vegso_kod = kod_mezo.strip() or str(random.randint(100000, 999999))
                     esp_ref.update({
-                        'wifi_ssid': wifi_nev.strip(),
+                        'wifi_ssid': wifi_nev,
                         'wifi_pass': wifi_jel,
                         'parosito_kod': vegso_kod
                     })
-                    st.success(f"Mentve! Az ESP32 átáll a(z) '{wifi_nev.strip()}' hálózatra.")
+                    st.success(f"Mentve! Az ESP32 átáll a(z) '{wifi_nev}' hálózatra.")
                     st.rerun()
                 else:
-                    st.error("Válassz vagy írj be egy Wi-Fi nevet!")
+                    st.error("Előbb csatlakoztasd a kártyát, hogy megjelenjenek a Wi-Fi hálózatok!")
 
             st.divider()
             st.subheader("🔑 Új párosító kód kérése / kártya alaphelyzetbe állítása")
