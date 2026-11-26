@@ -11,7 +11,7 @@ def mutasd():
     st.divider()
 
     @st.fragment(run_every=3)
-    def elo_allapot_es_grafikon():
+    def elo_adatok():
         adatok = db.reference('/').get() or {}
         akt_ho = adatok.get('aktualis_ho', 0)
 
@@ -23,7 +23,7 @@ def mutasd():
         # Napi grafikon megjelenítése
         grafikon.rogzit_es_rajzol(akt_ho)
 
-    elo_allapot_es_grafikon()
+    elo_adatok()
 
     adatok = db.reference('/').get() or {}
 
