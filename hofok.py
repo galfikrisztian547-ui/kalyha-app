@@ -10,12 +10,22 @@ def mutasd():
         st.rerun()
     st.divider()
 
-    adatok = db.reference('/').get() or {}
-    akt_ho = adatok.get('aktualis_ho', 0)
+    @st.fragment(run_every=3)
+    def elo_allapot_es_grafikon():
+        adatok = db.reference('/').get() or {}
+        akt_ho = adatok.get('aktualis_ho', 0)
 
-    col1, col2 = st.columns(2)
-    col1.metric("Vízhőfok", f"{akt_ho} °C")
-    col2.metric("Ajtó állapota", adatok.get('allapot', 'Ismeretlen'))
+        col1, col2 = st.columns(2)
+        col1.metric("Vízhőfok", f"{akt_ho} °C")
+        col2.metric("Ajtó állapota", adatok.get('allapot', 'Ismeretlen'))
+
+        st.write("---")
+        # Napi grafikon megjelenítése
+        grafikon.rogzit_es_rajzol(akt_ho)
+
+    elo_allapot_es_grafikon()
+
+    adatok = db.reference('/').get() or {}
 
     st.write("---")
     st.subheader("Automata hőfok határértékek")
@@ -31,6 +41,3 @@ def mutasd():
         db.reference('felso_hatar').set(felso)
         db.reference('uzemmod').set('AUTOMATA')
         st.success("Huzatszabályzó határértékek mentve!")
-
-    # Napi grafikon megjelenítése
-    grafikon.rogzit_es_rajzol(akt_ho)

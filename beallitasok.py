@@ -35,7 +35,7 @@ def mutasd():
                 st.rerun()
 
         st.write("")
-        if st.button("⏱️ Nyitás-Zárás idő & Hőfok teszt", use_container_width=True):
+        if st.button("⏱️ Nyitás-Zárás idő & Hőfok", use_container_width=True):
             st.session_state.beall_aloldal = 'idozites_teszt'
             st.rerun()
 
@@ -217,9 +217,9 @@ def mutasd():
         else:
             st.warning("Csak a Rendszergazda módosíthatja a Wi-Fi beállításokat.")
 
-    # --- 4. NYITÁS-ZÁRÁS IDŐZÍTÉS ÉS HŐFOK TESZT ALMENÜ ---
+    # --- 4. NYITÁS-ZÁRÁS IDŐZÍTÉS ÉS VALÓS HŐFOK ---
     elif st.session_state.beall_aloldal == 'idozites_teszt':
-        st.title("⏱️ Időzítés és Teszt")
+        st.title("⏱️ Időzítés és Hőfok")
         if st.button("🔙 Vissza a Beállításokhoz"):
             st.session_state.beall_aloldal = 'fomenu'
             st.rerun()
@@ -245,14 +245,13 @@ def mutasd():
 
         st.divider()
 
-        st.subheader("🧪 Vízhőfok szimulátor (Szenzor nélküli teszt)")
-        st.write("Húzd el a csúszkát, mintha melegedne vagy hűlne a víz, és nézd az ESP32 LED-jét:")
+        @st.fragment(run_every=3)
+        def valos_homero_panel():
+            st.subheader("🌡️ Valós mért hőmérséklet (DS18B20)")
+            akt_ho = db.reference('aktualis_ho').get()
+            if akt_ho is not None:
+                st.metric("Aktuális hőfok", f"{akt_ho} °C")
+            else:
+                st.warning("Még nem érkezett hőmérséklet-adat a Firebase-be.")
 
-        akt_ho = db.reference('aktualis_ho').get()
-        if akt_ho is None:
-            akt_ho = 22.5
-
-        teszt_ho = st.slider("Szimulált vízhőfok (°C)", min_value=15.0, max_value=95.0, value=float(akt_ho), step=0.5)
-        if st.button("🌡️ Hőfok beküldése", use_container_width=True):
-            db.reference('aktualis_ho').set(float(teszt_ho))
-            st.success(f"Vízhőfok beállítva erre: {teszt_ho} °C")
+        valos_homero_panel()
