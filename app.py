@@ -151,16 +151,19 @@ if not st.session_state.belepve:
 else:
     aktualis_nev = st.session_state.get('nev', '')
 
+    # MINDEN OLDALON LÁTHATÓ FELSŐ ÁLLAPOTSÁV (ONLINE + HŐFOK)
+    @st.fragment(run_every=5)
+    def felso_allapotsav():
+        eletjel.mutasd_felso_sav()
+
+    felso_allapotsav()
+
     if st.session_state.oldal == 'Főmenü':
         st.title(f"📱 Kályha Vezérlő ({aktualis_nev})")
 
-
-        # Élő Főmenü panel: 5 mp-enként ellenőrzi az életjelet, az új üzeneteket és a tűzrakás időzítőt
+        # Élő Főmenü panel: 5 mp-enként ellenőrzi az új üzeneteket és a tűzrakás időzítőt
         @st.fragment(run_every=5)
         def fomenu_panel():
-            # ESP32 kártya online/offline állapota
-            eletjel.mutasd_allapot()
-
             osszes_uzenet = db.reference('uzenetek').get() or {}
             olvasatlan_db = 0
             legujabb_nekem = None
@@ -243,7 +246,6 @@ else:
                 if st.button(uzenet_gomb_felirat, use_container_width=True):
                     st.session_state.oldal = 'Üzenetek'
                     st.rerun()
-
 
         fomenu_panel()
 
