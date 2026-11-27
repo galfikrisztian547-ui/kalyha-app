@@ -7,7 +7,6 @@ import time
 
 # BEIMPORTÁLJUK A KÜLSŐ FÁJLOKAT
 import hofok
-import pumpa
 import kamera
 import beallitasok
 import uzenetek
@@ -227,9 +226,6 @@ else:
 
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("⚙️ Beállítások", use_container_width=True):
-                    st.session_state.oldal = 'Beállítások'
-                    st.rerun()
                 if st.button("🌡️ Hőfok (Huzat)", use_container_width=True):
                     st.session_state.oldal = 'Hőfok'
                     st.rerun()
@@ -240,12 +236,13 @@ else:
                 if st.button("📷 Kamera", use_container_width=True):
                     st.session_state.oldal = 'Kamera'
                     st.rerun()
-                if st.button("💧 Pumpa", use_container_width=True):
-                    st.session_state.oldal = 'Pumpa'
-                    st.rerun()
                 if st.button(uzenet_gomb_felirat, use_container_width=True):
                     st.session_state.oldal = 'Üzenetek'
                     st.rerun()
+
+            if st.button("⚙️ Beállítások", use_container_width=True):
+                st.session_state.oldal = 'Beállítások'
+                st.rerun()
 
         fomenu_panel()
 
@@ -277,8 +274,6 @@ else:
     # ITT HÍVJUK MEG A KÜLSŐ FÁJLOKAT
     elif st.session_state.oldal == 'Hőfok':
         hofok.mutasd()
-    elif st.session_state.oldal == 'Pumpa':
-        pumpa.mutasd()
     elif st.session_state.oldal == 'Kamera':
         kamera.mutasd()
     elif st.session_state.oldal == 'Beállítások':
