@@ -10,31 +10,33 @@ def mutasd():
         st.rerun()
     st.divider()
 
-    @st.fragment(run_every=3)
+    @st.fragment(run_every=2)
     def elo_adatok():
-        adatok = db.reference('/').get() or {}
-        akt_ho = adatok.get('aktualis_ho', 0)
+        akt_ho = db.reference('aktualis_ho').get()
+        if akt_ho is None:
+            akt_ho = 0
+        ajto_allapot = db.reference('allapot').get() or 'Ismeretlen'
 
         col1, col2 = st.columns(2)
         col1.metric("Vízhőfok", f"{akt_ho} °C")
-        col2.metric("Ajtó állapota", adatok.get('allapot', 'Ismeretlen'))
+        col2.metric("Ajtó állapota", ajto_allapot)
 
         st.write("---")
-        # Napi grafikon megjelenítése
         grafikon.rogzit_es_rajzol(akt_ho)
 
     elo_adatok()
 
-    adatok = db.reference('/').get() or {}
+    also_mentett = db.reference('also_hatar').get()
+    felso_mentett = db.reference('felso_hatar').get()
 
     st.write("---")
     st.subheader("Automata hőfok határértékek")
 
     i_col1, i_col2 = st.columns(2)
     with i_col1:
-        also = st.number_input("Alsó határ (Nyit) °C", value=int(adatok.get('also_hatar', 50)), step=1)
+        also = st.number_input("Alsó határ (Nyit) °C", value=int(also_mentett if also_mentett is not None else 50), step=1)
     with i_col2:
-        felso = st.number_input("Felső határ (Zár) °C", value=int(adatok.get('felso_hatar', 70)), step=1)
+        felso = st.number_input("Felső határ (Zár) °C", value=int(felso_mentett if felso_mentett is not None else 70), step=1)
 
     if st.button("Mentés 💾", use_container_width=True):
         db.reference('also_hatar').set(also)

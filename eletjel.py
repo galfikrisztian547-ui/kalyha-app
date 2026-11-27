@@ -3,10 +3,21 @@ from firebase_admin import db
 import time
 
 
+def _normalizal_ido(ts):
+    try:
+        ertek = int(ts)
+        # Ha a Firebase ezredmásodpercben (13 számjegy) adta vissza, átváltjuk másodpercre
+        if ertek > 10_000_000_000:
+            ertek = ertek // 1000
+        return ertek
+    except Exception:
+        return 0
+
+
 def _allapot_adatok():
     esp_adat = db.reference('esp32_config').get() or {}
     parosito_kod = esp_adat.get('parosito_kod', '')
-    utolso_eletjel = esp_adat.get('utolso_eletjel', 0)
+    utolso_eletjel = _normalizal_ido(esp_adat.get('utolso_eletjel', 0))
     akt_ho = db.reference('aktualis_ho').get()
     return parosito_kod, utolso_eletjel, akt_ho
 
@@ -18,12 +29,12 @@ def mutasd_felso_sav():
     if not parosito_kod:
         st_szin = "#FFC107"
         st_szoveg = "⚪ Nincs párosítva"
-    elif not utolso_eletjel or int(utolso_eletjel) == 0:
+    elif utolso_eletjel == 0:
         st_szin = "#FFC107"
         st_szoveg = "🟡 Várakozás..."
     else:
-        eltelt_mp = int(time.time()) - int(utolso_eletjel)
-        if eltelt_mp <= 40:
+        eltelt_mp = max(0, int(time.time()) - utolso_eletjel)
+        if eltelt_mp <= 35:
             st_szin = "#00FF00"
             st_szoveg = "🟢 ONLINE"
         else:
@@ -51,14 +62,13 @@ def mutasd_allapot():
         st.warning("⚪ ESP32 Vezérlő: **Nincs párosítva** (Beállítások → Csatlakozás az ESP32-re)")
         return
 
-    if not utolso_eletjel or int(utolso_eletjel) == 0:
+    if utolso_eletjel == 0:
         st.warning("🟡 ESP32 Vezérlő: **Várakozás a kártyára...**")
         return
 
-    most = int(time.time())
-    eltelt_mp = most - int(utolso_eletjel)
+    eltelt_mp = max(0, int(time.time()) - utolso_eletjel)
 
-    if eltelt_mp <= 40:
+    if eltelt_mp <= 35:
         st.success("🟢 ESP32 Vezérlő: **ONLINE**")
     else:
         st.error(f"🔴 ESP32 Vezérlő: **OFFLINE!** (Utolsó jel: {eltelt_mp} mp-e)")

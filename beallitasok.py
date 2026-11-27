@@ -142,14 +142,16 @@ def mutasd():
         def esp_statusz_panel():
             friss = db.reference('esp32_config').get() or {}
             parosito_kod = friss.get('parosito_kod', '')
-            utolso_sziv = friss.get('utolso_eletjel', 0)
+            utolso_sziv = int(friss.get('utolso_eletjel', 0) or 0)
+            if utolso_sziv > 10_000_000_000:
+                utolso_sziv = utolso_sziv // 1000
             aktiv_wifi = friss.get('wifi_ssid', 'Nincs megadva')
             most = int(time.time())
 
             if parosito_kod:
                 st.info(f"🔑 **Aktív párosító kód:** `{parosito_kod}` | **Aktuális Wi-Fi:** `{aktiv_wifi}`")
 
-            if utolso_sziv > 0 and (most - int(utolso_sziv)) <= 25:
+            if utolso_sziv > 0 and (most - utolso_sziv) <= 35:
                 st.success("🟢 **Az ESP32 kártya ONLINE!**")
             elif parosito_kod:
                 st.warning("🟡 **Várakozás a kártya csatlakozására...**")
@@ -245,7 +247,7 @@ def mutasd():
 
         st.divider()
 
-        @st.fragment(run_every=3)
+        @st.fragment(run_every=2)
         def valos_homero_panel():
             st.subheader("🌡️ Valós mért hőmérséklet (DS18B20)")
             akt_ho = db.reference('aktualis_ho').get()

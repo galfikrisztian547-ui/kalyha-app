@@ -152,7 +152,7 @@ else:
     aktualis_nev = st.session_state.get('nev', '')
 
     # MINDEN OLDALON LÁTHATÓ FELSŐ ÁLLAPOTSÁV (ONLINE + HŐFOK)
-    @st.fragment(run_every=5)
+    @st.fragment(run_every=2)
     def felso_allapotsav():
         eletjel.mutasd_felso_sav()
 
