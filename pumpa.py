@@ -3,7 +3,7 @@ from firebase_admin import db
 
 
 def mutasd():
-    st.title("💧 Keringető Szivattyú / Huzat")
+    st.title("💧 Keringető Szivattyú")
     if st.button("🔙 Vissza"):
         st.session_state.oldal = 'Főmenü'
         st.rerun()
@@ -16,29 +16,26 @@ def mutasd():
     pumpa_adatok = db.reference('pumpa').get() or {}
     uzemmod = pumpa_adatok.get('uzemmod', 'AUTOMATA')
     allapot = pumpa_adatok.get('allapot', 'KI')
-    allapot_szoveg = "ZÁRVA (BE)" if allapot == "BE" else "NYITVA (KI)"
 
     col1, col2, col3 = st.columns(3)
     col1.metric("Vízhőfok", f"{aktualis_ho} °C")
-    col2.metric("Állapot", allapot_szoveg)
+    col2.metric("Szivattyú", allapot)
     col3.metric("Mód", uzemmod)
 
     st.write("---")
     if uzemmod == 'AUTOMATA':
         i_col1, i_col2 = st.columns(2)
         with i_col1:
-            ki_hatar = st.number_input("Alsó / Nyitás hőfok (KI) °C", value=int(pumpa_adatok.get('ki_hatar', 35)),
+            ki_hatar = st.number_input("Kikapcsolási hőfok (KI) °C", value=int(pumpa_adatok.get('ki_hatar', 35)),
                                        step=1)
         with i_col2:
-            be_hatar = st.number_input("Felső / Zárás hőfok (BE) °C", value=int(pumpa_adatok.get('be_hatar', 45)),
+            be_hatar = st.number_input("Bekapcsolási hőfok (BE) °C", value=int(pumpa_adatok.get('be_hatar', 45)),
                                        step=1)
 
         if st.button("Mentés 💾", use_container_width=True):
             db.reference('pumpa/ki_hatar').set(ki_hatar)
             db.reference('pumpa/be_hatar').set(be_hatar)
-            db.reference('also_hatar').set(ki_hatar)
-            db.reference('felso_hatar').set(be_hatar)
-            st.success("Határértékek mentve!")
+            st.success("Vízpumpa határértékek mentve!")
 
         if st.button("Váltás MANUÁLIS Módra 🖐", use_container_width=True):
             db.reference('pumpa/uzemmod').set('MANUALIS')
@@ -47,16 +44,14 @@ def mutasd():
         st.warning("⚠️ Manuális mód aktív: A hőfok figyelés kikapcsolva!")
         b_col1, b_col2 = st.columns(2)
         with b_col1:
-            if st.button("NYITÁS (KI) 🟢", use_container_width=True):
-                db.reference('pumpa/parancs').set('KI')
-                db.reference('pumpa/allapot').set('KI')
-                db.reference('allapot').set('NYITVA')
-                st.rerun()
-        with b_col2:
-            if st.button("ZÁRÁS (BE) 🔴", use_container_width=True):
+            if st.button("BEKAPCSOLÁS 🟢", use_container_width=True):
                 db.reference('pumpa/parancs').set('BE')
                 db.reference('pumpa/allapot').set('BE')
-                db.reference('allapot').set('ZÁRVA')
+                st.rerun()
+        with b_col2:
+            if st.button("KIKAPCSOLÁS 🔴", use_container_width=True):
+                db.reference('pumpa/parancs').set('KI')
+                db.reference('pumpa/allapot').set('KI')
                 st.rerun()
 
         if st.button("Váltás AUTOMATA Módra 🤖", use_container_width=True):
