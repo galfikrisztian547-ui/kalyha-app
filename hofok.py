@@ -1,6 +1,5 @@
 import streamlit as st
 from firebase_admin import db
-import grafikon
 
 
 def mutasd():
@@ -23,9 +22,6 @@ def mutasd():
         col1.metric("Vízhőfok", f"{akt_ho} °C")
         col2.metric("Ajtó", ajto_allapot)
         col3.metric("Mód", uzemmod_elo)
-
-        st.write("---")
-        grafikon.rogzit_es_rajzol(akt_ho)
 
     elo_adatok()
 
