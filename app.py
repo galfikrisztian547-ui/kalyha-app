@@ -15,6 +15,25 @@ import eletjel
 
 st.set_page_config(page_title="Kályha App", page_icon="🔥", layout="centered")
 
+APP_LINK = "https://kalyha-app-f6ktjmojgtaxtus3rtnigd.streamlit.app/"
+
+
+def mutasd_qr_kod():
+    qr_kep_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={APP_LINK}"
+    st.write("---")
+    st.markdown("<h4 style='text-align: center; color: #FFFFFF;'>📲 Applikáció megnyitása</h4>", unsafe_allow_html=True)
+    st.markdown(
+        f"<div style='text-align: center; margin: 10px 0;'>"
+        f"<img src='{qr_kep_url}' width='180' style='border-radius: 10px; border: 8px solid #FFFFFF; background: #FFFFFF;' />"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        "<p style='text-align: center; color: #AAAAAA; font-size: 14px;'>Szkenneld be egy másik telefonnal!</p>",
+        unsafe_allow_html=True
+    )
+
+
 # CSS - FEKETE HÁTTÉR, ZÖLD GOMBOK, FEHÉR MEZŐK PIROS BETŰKKEL
 st.markdown("""
     <style>
@@ -65,6 +84,7 @@ if 'oldal' not in st.session_state:
 if 'utolso_jelzett_uzenet_id' not in st.session_state:
     st.session_state.utolso_jelzett_uzenet_id = None
 
+
 # --- ESZKÖZ UJJLENYOMAT KÉSZÍTÉSE (BÖNGÉSZŐ + NYELV + PLATFORM ALAPJÁN) ---
 def eszkoz_azonosito():
     fejlecek = st.context.headers
@@ -73,6 +93,7 @@ def eszkoz_azonosito():
     sec_plat = fejlecek.get("Sec-Ch-Ua-Platform", "")
     nyers = f"{ua}|{lang}|{sec_plat}"
     return hashlib.sha256(nyers.encode("utf-8")).hexdigest()[:24]
+
 
 aktualis_eszkoz_id = eszkoz_azonosito()
 felhasznalok = db.reference('felhasznalok').get()
@@ -133,18 +154,8 @@ if not st.session_state.belepve:
                     db.reference('kerelmek').child(ker_nev).set({'jelszo': str(ker_jelszo)})
                     st.success("Kérelem elküldve! A Rendszergazda hagyhatja jóvá a Beállításokban.")
 
-    # ---------------- QR KÓD A BELÉPÉS ELŐTT ----------------
-    st.write("---")
-    st.markdown("<h4 style='text-align: center; color: #FFFFFF;'>📲 Applikáció megnyitása</h4>", unsafe_allow_html=True)
-
-    jovobeli_app_link = "https://kalyha-app-f6ktjmojgtaxtus3rtnigd.streamlit.app/"
-    qr_kep_url = f"https://api.qrserver.com/v1/create-qr-code/?size=180x180&data={jovobeli_app_link}"
-
-    qr_col1, qr_col2, qr_col3 = st.columns([1, 1, 1])
-    with qr_col2:
-        st.image(qr_kep_url)
-    st.markdown("<p style='text-align: center; color: #AAAAAA; font-size: 14px;'>Szkenneld be a telefonoddal!</p>",
-                unsafe_allow_html=True)
+    # QR KÓD A BELÉPÉSI KÉPERNYŐN IS
+    mutasd_qr_kod()
 
 # --- HA BELÉPTÜNK ---
 else:
@@ -270,6 +281,9 @@ else:
             db.reference(f'bejelentkezett_eszkozok/{aktualis_eszkoz_id}').delete()
             st.session_state.belepve = False
             st.rerun()
+
+        # QR KÓD A KIJELENTKEZÉS ALATT (MINDENKI LÁTJA A FŐMENÜBEN)
+        mutasd_qr_kod()
 
     # ITT HÍVJUK MEG A KÜLSŐ FÁJLOKAT
     elif st.session_state.oldal == 'Hőfok':
