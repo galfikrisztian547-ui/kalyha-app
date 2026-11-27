@@ -89,25 +89,41 @@ def mutasd():
             })
             st.rerun()
     else:
+        aktualis_ajto = (db.reference('huzat/allapot').get() or '').strip().upper()
+        if 'manualis_jelzes' not in st.session_state:
+            st.session_state.manualis_jelzes = ""
+
         b_col1, b_col2 = st.columns(2)
         with b_col1:
             if st.button("NYITÁS 🟢", use_container_width=True):
-                db.reference('huzat').update({
-                    'parancs': 'NYIT',
-                    'allapot': 'NYITVA',
-                    'manualis_lejarat': int(time.time()) + MANUALIS_IDO_MP
-                })
+                db.reference('huzat/manualis_lejarat').set(int(time.time()) + MANUALIS_IDO_MP)
+                if aktualis_ajto == 'NYITVA':
+                    st.session_state.manualis_jelzes = "ℹ️ A huzat már NYITVA van!"
+                else:
+                    db.reference('huzat').update({
+                        'parancs': 'NYIT',
+                        'allapot': 'NYITVA'
+                    })
+                    st.session_state.manualis_jelzes = "✅ Nyitás parancs elküldve (NYITVA)."
                 st.rerun()
         with b_col2:
             if st.button("ZÁRÁS 🔴", use_container_width=True):
-                db.reference('huzat').update({
-                    'parancs': 'ZAR',
-                    'allapot': 'ZÁRVA',
-                    'manualis_lejarat': int(time.time()) + MANUALIS_IDO_MP
-                })
+                db.reference('huzat/manualis_lejarat').set(int(time.time()) + MANUALIS_IDO_MP)
+                if aktualis_ajto == 'ZÁRVA':
+                    st.session_state.manualis_jelzes = "ℹ️ A huzat már ZÁRVA van!"
+                else:
+                    db.reference('huzat').update({
+                        'parancs': 'ZAR',
+                        'allapot': 'ZÁRVA'
+                    })
+                    st.session_state.manualis_jelzes = "✅ Zárás parancs elküldve (ZÁRVA)."
                 st.rerun()
 
+        if st.session_state.manualis_jelzes:
+            st.info(st.session_state.manualis_jelzes)
+
         if st.button("Váltás AUTOMATA Módra 🤖", use_container_width=True):
+            st.session_state.manualis_jelzes = ""
             db.reference('huzat').update({
                 'uzemmod': 'AUTOMATA',
                 'manualis_lejarat': 0
